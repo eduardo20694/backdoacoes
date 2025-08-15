@@ -1,5 +1,5 @@
 const express = require('express');
-const pool = require('./db');
+const pool = require('./db'); // seu pool do PostgreSQL
 const cors = require('cors');
 require('dotenv').config();
 
@@ -18,9 +18,13 @@ async function criarTabelas() {
         id SERIAL PRIMARY KEY,
         nome TEXT,
         endereco TEXT,
+        numero TEXT,
+        complemento TEXT,
+        bairro TEXT,
         cidade TEXT,
         estado TEXT,
         cep TEXT,
+        obs TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
@@ -45,7 +49,18 @@ async function criarTabelas() {
 // POST /donation
 app.post('/donation', async (req, res) => {
   try {
-    const { nome, endereco, cidade, estado, cep, items } = req.body;
+    const {
+      nome,
+      endereco,
+      numero,
+      complemento,
+      bairro,
+      cidade,
+      estado,
+      cep,
+      obs,
+      items
+    } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhum item enviado.' });
@@ -53,10 +68,12 @@ app.post('/donation', async (req, res) => {
 
     // Inserir doação
     const donationRes = await pool.query(
-      `INSERT INTO donations (nome, endereco, cidade, estado, cep)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [nome, endereco, cidade, estado, cep]
+      `INSERT INTO donations 
+       (nome, endereco, numero, complemento, bairro, cidade, estado, cep, obs)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [nome, endereco, numero, complemento, bairro, cidade, estado, cep, obs]
     );
+
     const donationId = donationRes.rows[0].id;
 
     // Inserir itens
