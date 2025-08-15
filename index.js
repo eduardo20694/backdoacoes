@@ -5,14 +5,13 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // para receber JSON
+app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Função para criar tabelas automaticamente
+// ===== Criar tabelas automaticamente =====
 async function criarTabelas() {
   try {
-    // Tabela de doações
     await pool.query(`
       CREATE TABLE IF NOT EXISTS donations (
         id SERIAL PRIMARY KEY,
@@ -29,7 +28,6 @@ async function criarTabelas() {
       );
     `);
 
-    // Tabela de itens de doação
     await pool.query(`
       CREATE TABLE IF NOT EXISTS donation_items (
         id SERIAL PRIMARY KEY,
@@ -46,24 +44,34 @@ async function criarTabelas() {
   }
 }
 
-// POST /donation
+// ===== Endpoint POST /donation =====
 app.post('/donation', async (req, res) => {
   try {
     const {
-      nome,
-      endereco,
-      numero,
-      complemento,
-      bairro,
-      cidade,
-      estado,
-      cep,
-      obs,
+      nome = '',
+      endereco = '',
+      numero = '',
+      complemento = '',
+      bairro = '',
+      cidade = '',
+      estado = '',
+      cep = '',
+      obs = '',
       items
     } = req.body;
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhum item enviado.' });
+    }
+
+    // Validação simples dos itens
+    for (const item of items) {
+      if (!item.nome_item || !item.quantidade || !item.unidade) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Cada item precisa ter nome, quantidade e unidade.' 
+        });
+      }
     }
 
     // Inserir doação
@@ -76,27 +84,27 @@ app.post('/donation', async (req, res) => {
 
     const donationId = donationRes.rows[0].id;
 
-    // Inserir itens
+    // Inserir itens da doação
     const insertItemsPromises = items.map(item =>
       pool.query(
         `INSERT INTO donation_items (donation_id, nome_item, quantidade, unidade)
-         VALUES ($1,$2,$3,$4)`,
+         VALUES ($1, $2, $3, $4)`,
         [donationId, item.nome_item, item.quantidade, item.unidade]
       )
     );
     await Promise.all(insertItemsPromises);
 
-    res.json({ success: true, message: 'Doação salva!' });
+    res.json({ success: true, message: 'Doação salva com sucesso!' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erro ao salvar doação' });
+    console.error('Erro ao salvar doação:', err);
+    res.status(500).json({ success: false, error: 'Erro interno ao salvar a doação.' });
   }
 });
 
-// Teste
+// Endpoint de teste
 app.get('/', (req, res) => res.send('Backend funcionando!'));
 
-// Inicialização do servidor + criação de tabelas
+// ===== Inicialização =====
 app.listen(PORT, async () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   await criarTabelas();
